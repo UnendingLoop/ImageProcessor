@@ -1,0 +1,57 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true        # проверять _test.go тоже
+  issues.exclude-dirs:
+    - vendor
+    - build
+  issues.exclude-files:
+    - ".*_gen.go"    # сгенерированные файлы
+
+linters:
+  enable:
+    - govet           # стандартная проверка Go
+    - staticcheck     # статический анализ
+    - errcheck        # все ошибки должны проверяться
+    - gosimple        # упрощение кода
+    - ineffassign     # неэффективные присваивания
+    - typecheck       # проверка типов
+    - unused          # неиспользуемые функции/переменные
+    - gofmt           # проверка форматирования
+    - goimports       # проверка импортов
+    - gocritic        # расширенные проверки
+    - revive          # стиль и идиомы
+    - stylecheck      # дополнительные стиль-правила
+    - gocyclo         # сложность функций
+    - bodyclose       # закрытие ридеров, http.Body
+    - dogsled         # игнорирование return values
+    - misspell        # опечатки в коде
+    - whitespace      # лишние пробелы
+    - wrapcheck       # проверка fmt.Errorf("%w")
+  disable-all: false
+
+linters-settings:
+  gocyclo:
+    min-complexity: 10   # функции сложнее 10 будут предупреждать
+  revive:
+    severity: warning
+    rules:
+      - name: var-naming
+      - name: import-shadowing
+      - name: package-comments
+      - name: indent-error-flow
+      - name: unexported-return
+  gofmt:
+    simplify: true
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: "_test\\.go"
+      linters:
+        - gocyclo       # не проверяем сложность тестов
+    - linters:
+        - misspell
+      text: "TODO"      # TODO можно игнорировать в misspell
