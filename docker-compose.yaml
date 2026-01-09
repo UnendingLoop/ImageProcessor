@@ -9,44 +9,34 @@ services:
     ports:
       - "6543:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U wbuser -d wildberries" ]
+      test: [ "CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB" ]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
-      - img-storage:/var/lib/postgresql/data
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    healthcheck:
-      test: [ "CMD", "bash", "-c", "echo ruok | nc -w 5 localhost 2181 | grep imok" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    ports:
-      - "2181:2181"
-    depends_on:
-      - postgres
-
+      - pg-data:/var/lib/postgresql/data
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
+    image: bitnami/kafka:3.6
     container_name: kafka
-    depends_on:
-      - zookeeper
     ports:
-      - "29092:29092"
+      - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # === KRaft ===
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+
+      # === listeners ===
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+
+      # === misc ===
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
   minio:
     image: minio/minio
     container_name: ${MINIO_CONTAINER_NAME}
@@ -58,17 +48,31 @@ services:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASS}
     volumes:
-      - img-storage:/data
-  app:
+      - minio-data:/data
+  api:
     build: .
-    container_name: image-service
+    image: image-processor:latest
+    container_name: image-api
+    env_file: .env
+    command: [ "/usr/local/bin/api" ]
     ports:
-      - "8081:8081"
+      - "8080:8080"
     depends_on:
       - kafka
       - postgres
-      - zookeeper
-    restart: on-failure
+      - minio
+
+  worker:
+    image: image-processor:latest
+    container_name: image-worker
+    env_file: .env
+    command: [ "/usr/local/bin/worker" ]
+    depends_on:
+      - kafka
+      - postgres
+      - minio
+      - api
 
 volumes:
-  img-storage:
+  pg-data:
+  minio-data:

@@ -51,16 +51,16 @@ func main() {
 	groupID := appConfig.GetString("KAFKA_GROUPID")
 	cons := wbfkafka.NewConsumer([]string{broker}, topic, groupID)
 
-	// Listening to interruptions through context - здесь точно лучшее место для объявления слушателя?
+	// Слушаем прерывания через контекст
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	cons.StartConsuming(ctx, queue, retryStrategy)
 
 	// Собираем воедино все что нужно воркеру и запускаем его
-	go worker.NewWorkerInstance(strg, svc, queue, cons, appConfig.GetString("RESULT_KEY")).StartWorker(ctx) // немного напрягает что нет присвоения реальной переменной, а сразу запуск
+	go worker.NewWorkerInstance(strg, svc, queue, cons, appConfig.GetString("RESULT_KEY")).StartWorker(ctx)
 
-	// Waiting for interruption to stop context to start Graceful shutdown
+	// ждем отмены контекста для запуска грейсфул закрытия соединений бд и кафки
 	<-ctx.Done()
 
 	shutdown(cons, dbConn)

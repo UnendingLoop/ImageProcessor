@@ -1,29 +1,20 @@
-# 1. Используем официальный образ Go для сборки
-FROM golang:1.24 AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
-
-# Копируем go.mod и go.sum отдельно, чтобы кэшировать зависимости
 COPY go.mod go.sum ./
 RUN go mod download
-
-# Копируем весь код и собираем бинарник
 COPY . .
-RUN go build -o orderservice ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -o /bin/api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -o /bin/worker ./cmd/worker
 
-
-
-# 2. Минимальный образ для запуска
-FROM debian:bookworm-slim
-
+FROM alpine:3.20
 WORKDIR /app
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /bin/api /usr/local/bin/api
+COPY --from=builder /bin/worker /usr/local/bin/worker
 
-COPY --from=builder /app/orderservice .
-
-COPY .env .env
 COPY internal/web /app/internal/web
-COPY internal/kafka/ /app/internal/kafka
-
-EXPOSE 8081
-
-CMD ["./orderservice"]
+COPY internal/migrations /app/migrations
+EXPOSE 8080

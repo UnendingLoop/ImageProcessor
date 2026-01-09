@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Image Processor</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .task {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .processing {
+            color: orange;
+        }
+
+        .done {
+            color: green;
+        }
+
+        .failed {
+            color: red;
+        }
+
+        img {
+            max-width: 200px;
+            display: block;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Image Processor</h1>
+
+    <form id="uploadForm">
+        <input type="file" name="file" required />
+        <button type="submit">Загрузить</button>
+    </form>
+
+    <hr />
+
+    <h2>Задачи</h2>
+    <div id="tasks"></div>
+
+    <script>
+        const API = 'http://localhost:8080';
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+
+            await fetch(`${API}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            e.target.reset();
+            loadTasks();
+        });
+
+        async function loadTasks() {
+            const res = await fetch(`${API}/images`);
+            const tasks = await res.json();
+
+            const container = document.getElementById('tasks');
+            container.innerHTML = '';
+
+            tasks.forEach(task => {
+                const div = document.createElement('div');
+                div.className = `task ${task.status}`;
+
+                div.innerHTML = `
+      <strong>ID:</strong> ${task.id}<br/>
+      <strong>Status:</strong> ${task.status}<br/>
+    `;
+
+                if (task.status === 'done') {
+                    const img = document.createElement('img');
+                    img.src = `${API}/image/${task.id}`;
+                    div.appendChild(img);
+
+                    const link = document.createElement('a');
+                    link.href = `${API}/image/${task.id}`;
+                    link.innerText = 'Скачать';
+                    link.download = true;
+                    div.appendChild(link);
+                }
+
+                const delBtn = document.createElement('button');
+                delBtn.innerText = 'Удалить';
+                delBtn.onclick = async () => {
+                    await fetch(`${API}/image/${task.id}`, { method: 'DELETE' });
+                    loadTasks();
+                };
+
+                div.appendChild(document.createElement('br'));
+                div.appendChild(delBtn);
+
+                container.appendChild(div);
+            });
+        }
+
+        loadTasks();
+        setInterval(loadTasks, 3000);
+    </script>
+
+</body>
+
+</html>

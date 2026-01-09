@@ -26,9 +26,10 @@ func NewMinioClient(cfg *config.Config) (*MinioImageStorage, error) {
 
 	user := cfg.GetString("MINIO_USER")
 	pass := cfg.GetString("MINIO_PASS")
+	addr := cfg.GetString("MINIO_CONTAINER_NAME")
 
 	// подключаемся к минио - создаем клиента
-	strg, err := minio.New("localhost:9000", &minio.Options{
+	strg, err := minio.New(addr+":9000", &minio.Options{
 		Creds:  credentials.NewStaticV4(user, pass, ""),
 		Secure: false,
 	})

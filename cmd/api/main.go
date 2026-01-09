@@ -31,6 +31,9 @@ func main() {
 
 	// подключитсья к базе
 	dbConn := repository.ConnectWithRetries(appConfig, 5, 10*time.Second)
+	// накатываем мигрцацию
+	repository.MigrateWithRetries(dbConn.Master, "./migrations", 5, 10*time.Second)
+
 	// подкллючиться к хранилищу
 	strg := storage.NewImgStorage(appConfig)
 	// создаем экземпляр репо
@@ -54,7 +57,7 @@ func main() {
 	engine.GET("/ping", handlers.SimplePinger)
 	engine.POST("/images/upload", handlers.Create) // создание
 	engine.GET("/images/:id", handlers.LoadResult) // загрузка результата
-	engine.GET("/images", handlers.GetAllImages)   // получение списка картинок с пагинацией и сортировкой через квери: ?page=1&limit=20&sort=created_at&order=ascending
+	engine.GET("/images", handlers.GetAllImages)   // получение списка картинок с пагинацией и сортировкой
 	engine.DELETE("/images/:id", handlers.Delete)  // удаление
 	engine.Static("/web", "./internal/web")
 
@@ -63,7 +66,7 @@ func main() {
 		Handler: engine,
 	}
 
-	// Listening to interruptions through context - здесь точно лучшее место для объявления слушателя?
+	// Слушаем прерывания через контекст
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -82,7 +85,7 @@ func main() {
 		}
 	}()
 
-	// Waiting for interruption to stop context to start Graceful shutdown
+	// ждем отмены контекста для запуска грейсфул закрытия соединений бд и кафки
 	<-ctx.Done()
 
 	shutdown(pub, dbConn)
