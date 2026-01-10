@@ -24,5 +24,5 @@ CREATE TABLE IF NOT EXISTS images (
     ),
     err_msg err_msg JSONB DEFAULT '[]',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

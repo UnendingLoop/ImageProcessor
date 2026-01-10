@@ -28,8 +28,8 @@ func (NoopPublisher) SendWithRetry(ctx context.Context, strategy retry.Strategy,
 }
 
 type ImageWorkerService interface {
-	UpdateStatus(ctx context.Context, id string, newStat string) error
-	SaveResult(ctx context.Context, id string, resFile io.Reader, resSize int64, cType string) error
+	UpdateStatus(ctx context.Context, id string, newStat model.Status) error
+	SaveResult(ctx context.Context, res *model.Image) error
 	Get(ctx context.Context, id string) (*model.Image, error)
 }
 
@@ -51,16 +51,18 @@ func (w *Worker) StartWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case msg, ok := <-w.queue:
-			if !ok { // может дочитывать сообщения даже если канал закрыт?
+			if !ok {
+				log.Println("Queue channel closed, stopping worker...")
 				return
 			}
 			id := string(msg.Key)
 			if err := w.initProcessor(ctx, id); err != nil && !errors.Is(err, model.ErrImageNotFound) {
-				log.Printf("task %s failed: %v", id, err)
-				w.service.UpdateStatus(ctx, id, string(model.StatusFailed)) // потом добавить отправку в DLQ
+				log.Printf("Task %s failed: %v", id, err)
 				continue
 			}
-			w.consumer.Commit(ctx, msg)
+			if err := w.consumer.Commit(ctx, msg); err != nil {
+				log.Printf("Failed to commit queue-message: %v", err)
+			}
 		}
 	}
 }
@@ -81,17 +83,23 @@ func (w *Worker) initProcessor(ctx context.Context, id string) error {
 
 	// на всякий случай проверить поле с результатом
 	if strings.Contains(task.ResultKey, w.resultPrefix) {
-		if err := w.service.UpdateStatus(ctx, id, string(model.StatusDone)); err != nil {
-			return fmt.Errorf("Failed to update status of done task int DB: %w", err)
+		if err := w.service.UpdateStatus(ctx, id, model.StatusDone); err != nil {
+			return fmt.Errorf("failed to update status of already-done task in DB: %w", err)
 		}
 		return nil
 	}
 
 	// обновить статус
-	if err := w.service.UpdateStatus(ctx, id, string(model.StatusInProgress)); err != nil {
+	if err := w.service.UpdateStatus(ctx, id, model.StatusInProgress); err != nil {
+		return fmt.Errorf("failed to update status of task %q to `in_progress` in DB: %w", id, err)
 	}
 
-	if err := w.processTask(ctx, task); err != nil {
+	// выполняем саму операцию
+	if pErr := w.processTask(ctx, task); pErr != nil {
+		if uErr := w.service.UpdateStatus(ctx, id, model.StatusFailed); uErr != nil {
+			return fmt.Errorf("failed to set status of task %q to `failed` in DB: %w \nAFTER\n error while processing task: %w", id, uErr, pErr)
+		}
+		return fmt.Errorf("failed to process task %q: %w", id, pErr)
 	}
 
 	return nil
@@ -101,22 +109,22 @@ func (w *Worker) processTask(ctx context.Context, task *model.Image) error {
 	// достать из storage исходники
 	base, _, err := w.storage.Get(ctx, task.SourceKey)
 	if err != nil {
-		return fmt.Errorf("worker failed to fetch base image %q from storage: %w", task.UID.String(), err)
+		return fmt.Errorf("worker failed to fetch base-image from storage: %w", err)
 	}
 
 	wm, _, err := w.storage.Get(ctx, task.WatermarkKey)
 	if err != nil && task.Operation == model.OpWaterMark {
-		return fmt.Errorf("worker failed to fetch wm image %q from storage: %w", task.UID.String(), err)
+		return fmt.Errorf("worker failed to fetch wm-image from storage: %w", err)
 	}
 
 	// определить формат выходного файла из cType исходника
 	pBase, format, err := validateImgFormat(base, false)
 	if err != nil {
-		return fmt.Errorf("worker failed to validate base image %q  format: %w", task.UID.String(), err)
+		return fmt.Errorf("worker failed to validate base-image format: %w", err)
 	}
 	pWm, _, err := validateImgFormat(wm, true)
 	if err != nil && task.Operation == model.OpWaterMark {
-		return fmt.Errorf("worker failed to validate wm image %q  format: %w", task.UID.String(), err)
+		return fmt.Errorf("worker failed to validate wm-image format: %w", err)
 	}
 
 	// выполнить операцию
@@ -126,17 +134,17 @@ func (w *Worker) processTask(ctx context.Context, task *model.Image) error {
 	case model.OpResize:
 		result, size, err = imageproc.Resize(pBase, *task.X, *task.Y, format)
 		if err != nil {
-			return fmt.Errorf("worker failed to resize image %q: %w", task.UID.String(), err)
+			return fmt.Errorf("worker failed to resize image: %w", err)
 		}
 	case model.OpThumbNail:
 		result, size, err = imageproc.Thumbnail(pBase, *task.X, *task.Y, format)
 		if err != nil {
-			return fmt.Errorf("worker failed to generate thumbnail from image %q: %w", task.UID.String(), err)
+			return fmt.Errorf("worker failed to generate thumbnail from image: %w", err)
 		}
 	case model.OpWaterMark:
 		result, size, err = imageproc.Watermark(pBase, pWm, format)
 		if err != nil {
-			return fmt.Errorf("worker failed to apply wm on image %q: %w", task.UID.String(), err)
+			return fmt.Errorf("worker failed to apply wm on image: %w", err)
 		}
 	default:
 		return model.ErrIncorrectOp
@@ -146,16 +154,21 @@ func (w *Worker) processTask(ctx context.Context, task *model.Image) error {
 	resCType := model.GetCType[format]
 	resKey := w.resultPrefix + task.UID.String() + model.GetImageFileExt[resCType]
 	if err := w.storage.Put(ctx, resKey, size, resCType, result); err != nil {
-		return fmt.Errorf("worker failed to put reeult image %q to storage: %w", task.UID.String(), err)
+		return fmt.Errorf("worker failed to put result image to storage: %w", err)
 	}
 
 	task.Status = model.StatusDone
 	task.ResultKey = resKey
 
+	// обновить запись в БД
+	if err := w.service.SaveResult(ctx, task); err != nil {
+		return fmt.Errorf("worker failed to save result to DB: %w", err)
+	}
 	return nil
 }
 
 func validateImgFormat(r io.ReadCloser, wm bool) (io.Reader, imaging.Format, error) {
+	defer r.Close()
 	br := bufio.NewReader(r)
 
 	// читаем первые 512 байт для определения формата - должно быть достаточно?
@@ -179,7 +192,7 @@ func validateImgFormat(r io.ReadCloser, wm bool) (io.Reader, imaging.Format, err
 		return nil, -1, model.ErrUnsupportedWMFormat
 	}
 
-	if format != imaging.JPEG || format != imaging.PNG || format != imaging.GIF {
+	if format != imaging.JPEG && format != imaging.PNG && format != imaging.GIF {
 		return nil, -1, model.ErrUnsupportedFormat
 	}
 

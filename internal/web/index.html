@@ -2,122 +2,655 @@
 <html lang="ru">
 
 <head>
-    <meta charset="UTF-8" />
-    <title>Image Processor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImageProcessor - Обработка изображений</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: sans-serif;
-            max-width: 900px;
-            margin: 40px auto;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
         }
 
-        h1 {
-            margin-bottom: 20px;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
         }
 
-        .task {
-            border: 1px solid #ddd;
-            padding: 10px;
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
             margin-bottom: 10px;
         }
 
-        .processing {
-            color: orange;
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
         }
 
-        .done {
-            color: green;
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
         }
 
-        .failed {
-            color: red;
+        .form-section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         }
 
-        img {
-            max-width: 200px;
+        .form-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
             display: block;
-            margin-top: 10px;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input[type="file"],
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input[type="file"]:hover,
+        .form-group select:hover {
+            border-color: #667eea;
+        }
+
+        .form-group input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-download {
+            background: #27ae60;
+            color: white;
+            padding: 8px 12px;
+            font-size: 0.9em;
+        }
+
+        .btn-download:hover {
+            background: #229954;
+        }
+
+        .btn-delete {
+            background: #e74c3c;
+            color: white;
+            padding: 8px 12px;
+            font-size: 0.9em;
+        }
+
+        .btn-delete:hover {
+            background: #c0392b;
+        }
+
+        .tasks-section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-height: 700px;
+            overflow-y: auto;
+        }
+
+        .tasks-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .task-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .task-item:hover {
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            transform: translateX(5px);
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .task-id {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .task-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-created {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .status-in_progress {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .status-done {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .status-failed {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .task-details {
+            font-size: 0.95em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .task-details p {
+            margin: 5px 0;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: 600;
+            animation: slideIn 0.3s ease-out;
+            z-index: 1000;
+        }
+
+        .toast.success {
+            background: #27ae60;
+        }
+
+        .toast.error {
+            background: #e74c3c;
+        }
+
+        .toast.info {
+            background: #3498db;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .operation-info {
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .tasks-section {
+                max-height: none;
+            }
         }
     </style>
 </head>
 
 <body>
+    <div class="container">
+        <div class="header">
+            <h1>🖼️ ImageProcessor</h1>
+            <p>Обработка изображений в облаке</p>
+        </div>
 
-    <h1>Image Processor</h1>
+        <div class="main-content">
+            <!-- Форма загрузки -->
+            <div class="form-section">
+                <h2>Создать задачу</h2>
 
-    <form id="uploadForm">
-        <input type="file" name="file" required />
-        <button type="submit">Загрузить</button>
-    </form>
+                <div class="operation-info">
+                    <strong>Выберите операцию обработки:</strong><br>
+                    <small>
+                        • <strong>Resize:</strong> изменение размера<br>
+                        • <strong>Thumbnail:</strong> создание миниатюры<br>
+                        • <strong>Watermark:</strong> добавление водяного знака
+                    </small>
+                </div>
 
-    <hr />
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label for="operation">Операция*</label>
+                        <select id="operation" required>
+                            <option value="">-- Выберите --</option>
+                            <option value="resize">Resize (изменение размера)</option>
+                            <option value="thumbnail">Thumbnail (миниатюра)</option>
+                            <option value="watermark">Watermark (водяной знак)</option>
+                        </select>
+                    </div>
 
-    <h2>Задачи</h2>
-    <div id="tasks"></div>
+                    <div class="form-row" id="axisFields" style="display: none;">
+                        <div class="form-group">
+                            <label for="xAxis">Ширина (px)*</label>
+                            <input type="number" id="xAxis" min="1" max="4000" placeholder="800">
+                        </div>
+                        <div class="form-group">
+                            <label for="yAxis">Высота (px)*</label>
+                            <input type="number" id="yAxis" min="1" max="4000" placeholder="600">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="image">Исходное изображение*</label>
+                        <input type="file" id="image" accept="image/jpeg,image/png,image/gif" required>
+                        <small style="color: #999;">Форматы: JPG, PNG, GIF (макс. 32MB)</small>
+                    </div>
+
+                    <div class="form-group" id="watermarkField" style="display: none;">
+                        <label for="watermark">Водяной знак (PNG)*</label>
+                        <input type="file" id="watermark" accept="image/png">
+                        <small style="color: #999;">Только PNG, макс. 32MB</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <span id="submitText">Отправить на обработку</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Список задач -->
+            <div class="tasks-section">
+                <h2>Задачи на обработку</h2>
+                <div id="tasksList">
+                    <div class="empty-state">
+                        <p>📋 Нет задач</p>
+                        <p style="font-size: 0.9em;">Создайте первую задачу слева →</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        const API = 'http://localhost:8080';
+        const API_BASE = '/api';
+        const POLL_INTERVAL = 2000; // 2 секунды
+        let pollInterval;
 
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const formData = new FormData(e.target);
-
-            await fetch(`${API}/upload`, {
-                method: 'POST',
-                body: formData
-            });
-
-            e.target.reset();
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            setupFormListeners();
             loadTasks();
+            startPolling();
         });
 
-        async function loadTasks() {
-            const res = await fetch(`${API}/images`);
-            const tasks = await res.json();
+        // Обработчики формы
+        function setupFormListeners() {
+            const operation = document.getElementById('operation');
+            const axisFields = document.getElementById('axisFields');
+            const watermarkField = document.getElementById('watermarkField');
 
-            const container = document.getElementById('tasks');
-            container.innerHTML = '';
+            operation.addEventListener('change', (e) => {
+                axisFields.style.display = ['resize', 'thumbnail'].includes(e.target.value) ? 'grid' : 'none';
+                watermarkField.style.display = e.target.value === 'watermark' ? 'block' : 'none';
 
-            tasks.forEach(task => {
-                const div = document.createElement('div');
-                div.className = `task ${task.status}`;
-
-                div.innerHTML = `
-      <strong>ID:</strong> ${task.id}<br/>
-      <strong>Status:</strong> ${task.status}<br/>
-    `;
-
-                if (task.status === 'done') {
-                    const img = document.createElement('img');
-                    img.src = `${API}/image/${task.id}`;
-                    div.appendChild(img);
-
-                    const link = document.createElement('a');
-                    link.href = `${API}/image/${task.id}`;
-                    link.innerText = 'Скачать';
-                    link.download = true;
-                    div.appendChild(link);
+                if (['resize', 'thumbnail'].includes(e.target.value)) {
+                    document.getElementById('xAxis').required = true;
+                    document.getElementById('yAxis').required = true;
+                } else {
+                    document.getElementById('xAxis').required = false;
+                    document.getElementById('yAxis').required = false;
                 }
 
-                const delBtn = document.createElement('button');
-                delBtn.innerText = 'Удалить';
-                delBtn.onclick = async () => {
-                    await fetch(`${API}/image/${task.id}`, { method: 'DELETE' });
-                    loadTasks();
-                };
+                if (e.target.value === 'watermark') {
+                    document.getElementById('watermark').required = true;
+                } else {
+                    document.getElementById('watermark').required = false;
+                }
+            });
 
-                div.appendChild(document.createElement('br'));
-                div.appendChild(delBtn);
+            document.getElementById('uploadForm').addEventListener('submit', handleFormSubmit);
+        }
 
-                container.appendChild(div);
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const operation = document.getElementById('operation').value;
+            const image = document.getElementById('image').files[0];
+            const watermark = document.getElementById('watermark').files[0];
+
+            if (!image) {
+                showToast('Выберите изображение', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('operation', operation);
+            formData.append('image', image);
+
+            if (['resize', 'thumbnail'].includes(operation)) {
+                const x = document.getElementById('xAxis').value;
+                const y = document.getElementById('yAxis').value;
+                if (!x || !y) {
+                    showToast('Укажите размеры', 'error');
+                    return;
+                }
+                formData.append('x_axis', x);
+                formData.append('y_axis', y);
+            }
+
+            if (operation === 'watermark' && watermark) {
+                formData.append('watermark', watermark);
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const submitText = document.getElementById('submitText');
+            submitBtn.disabled = true;
+            submitText.innerHTML = '<span class="loading"></span>Загрузка...';
+
+            try {
+                const response = await fetch('/images/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Ошибка при загрузке');
+                }
+
+                const result = await response.json();
+                showToast('Задача создана! ID: ' + result.uid.slice(0, 8), 'success');
+                document.getElementById('uploadForm').reset();
+                document.getElementById('axisFields').style.display = 'none';
+                document.getElementById('watermarkField').style.display = 'none';
+
+                loadTasks();
+            } catch (error) {
+                showToast('Ошибка: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitText.textContent = 'Отправить на обработку';
+            }
+        }
+
+        // Загрузка списка задач
+        async function loadTasks() {
+            try {
+                const response = await fetch('/images?page=1&limit=50&sort=created&order=descend');
+                if (!response.ok) throw new Error('Ошибка при загрузке задач');
+
+                const tasks = await response.json();
+                renderTasks(tasks || []);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                document.getElementById('tasksList').innerHTML =
+                    '<div class="empty-state"><p>⚠️ Ошибка загрузки задач</p></div>';
+            }
+        }
+
+        function renderTasks(tasks) {
+            const tasksList = document.getElementById('tasksList');
+
+            if (!tasks || tasks.length === 0) {
+                tasksList.innerHTML = '<div class="empty-state"><p>📋 Нет задач</p></div>';
+                return;
+            }
+
+            tasksList.innerHTML = tasks.map(task => `
+                <div class="task-item">
+                    <div class="task-header">
+                        <div class="task-id">ID: ${task.uid.slice(0, 8)}...${task.uid.slice(-4)}</div>
+                        <span class="task-status status-${task.status}">
+                            ${formatStatus(task.status)}
+                        </span>
+                    </div>
+                    <div class="task-details">
+                        <p><strong>Операция:</strong> ${formatOperation(task.operation)}</p>
+                        <p><strong>Размеры:</strong> ${task.x_axis || '--'} × ${task.y_axis || '--'} px</p>
+                        <p><strong>Создано:</strong> ${formatDate(task.created_at)}</p>
+                        ${task.error && task.error.length > 0 ?
+                    `<p style="color: #e74c3c;"><strong>Ошибка:</strong> ${task.error[0]}</p>` : ''}
+                    </div>
+                    <div class="task-actions">
+                        ${task.status === 'done' ?
+                    `<button class="btn btn-download" onclick="downloadResult('${task.uid}')">⬇️ Скачать</button>` : ''}
+                        <button class="btn btn-delete" onclick="deleteTask('${task.uid}')">🗑️ Удалить</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Скачивание результата
+        async function downloadResult(uid) {
+            try {
+                const response = await fetch(`/images/${uid}`);
+                if (!response.ok) throw new Error('Ошибка при скачивании');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `result-${uid.slice(0, 8)}.${getExtension(response.headers.get('content-type'))}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+                showToast('Файл загружен', 'success');
+            } catch (error) {
+                showToast('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Удаление задачи
+        async function deleteTask(uid) {
+            if (!confirm('Удалить задачу и все связанные файлы?')) return;
+
+            try {
+                const response = await fetch(`/images/${uid}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Ошибка при удалении');
+
+                showToast('Задача удалена', 'success');
+                loadTasks();
+            } catch (error) {
+                showToast('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Полинг для обновления статусов
+        function startPolling() {
+            pollInterval = setInterval(loadTasks, POLL_INTERVAL);
+        }
+
+        // Вспомогательные функции
+        function formatStatus(status) {
+            const statusMap = {
+                'created': '📋 Создана',
+                'in_progress': '⏳ В обработке',
+                'done': '✅ Готова',
+                'failed': '❌ Ошибка'
+            };
+            return statusMap[status] || status;
+        }
+
+        function formatOperation(op) {
+            const opMap = {
+                'resize': 'Resize',
+                'thumbnail': 'Миниатюра',
+                'watermark': 'Водяной знак'
+            };
+            return opMap[op] || op;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '--';
+            const date = new Date(dateString);
+            return date.toLocaleString('ru-RU', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
             });
         }
 
-        loadTasks();
-        setInterval(loadTasks, 3000);
-    </script>
+        function getExtension(contentType) {
+            const extMap = {
+                'image/jpeg': 'jpg',
+                'image/png': 'png',
+                'image/gif': 'gif'
+            };
+            return extMap[contentType] || 'jpg';
+        }
 
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Очистка при выходе
+        window.addEventListener('beforeunload', () => {
+            if (pollInterval) clearInterval(pollInterval);
+        });
+    </script>
 </body>
 
 </html>

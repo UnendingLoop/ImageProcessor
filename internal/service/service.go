@@ -48,7 +48,7 @@ type ImageStorage interface {
 // Стратегия ретрая отправки в очередь - можно потом вынести значения в конфиг/env
 var retryStrategy = retry.Strategy{
 	Attempts: 5,
-	Delay:    2 * time.Second,
+	Delay:    3 * time.Second,
 	Backoff:  1.5,
 }
 
@@ -198,14 +198,9 @@ func (c ImageService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (c ImageService) UpdateStatus(ctx context.Context, id string, rawStat string) error {
+func (c ImageService) UpdateStatus(ctx context.Context, id string, newStat model.Status) error {
 	if err := uuid.Validate(id); err != nil {
 		return model.ErrIncorrectID
-	}
-
-	newStat := model.Status(rawStat)
-	if !model.StatusMap[newStat] {
-		return model.ErrIncorrectStatus
 	}
 
 	logger := mwlogger.LoggerFromContext(ctx)
@@ -223,22 +218,11 @@ func (c ImageService) UpdateStatus(ctx context.Context, id string, rawStat strin
 	return nil
 }
 
-func (c ImageService) SaveResult(ctx context.Context, id string, resFile io.Reader, resSize int64, cType string) error {
-	if err := uuid.Validate(id); err != nil {
-		return model.ErrIncorrectID
-	}
+func (c ImageService) SaveResult(ctx context.Context, input *model.Image) error {
 	logger := mwlogger.LoggerFromContext(ctx)
-
-	resKey := c.resultKeyPrefix + id + model.GetImageFileExt[cType]
-
-	// сохраняем в хранилище
-	if err := c.storage.Put(ctx, resKey, resSize, cType, resFile); err != nil {
-		logger.Error().Err(err).Msg("Failed to save result-image in Storage")
-		return model.ErrCommon500
-	}
-
-	// сохраняем в БД
-	if err := c.repo.SaveResult(ctx, id, model.StatusDone, resKey); err != nil {
+	t := time.Now().UTC()
+	input.UpdatedAt = &t
+	if err := c.repo.SaveResult(ctx, input); err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			return model.ErrImageNotFound // 404
@@ -249,4 +233,20 @@ func (c ImageService) SaveResult(ctx context.Context, id string, resFile io.Read
 	}
 
 	return nil
+}
+
+func (c ImageService) ReviveOrphans(ctx context.Context, limit int) {
+	logger := mwlogger.LoggerFromContext(ctx)
+
+	orphans, err := c.repo.FetchOrphans(ctx, limit)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to load orphans from DB")
+		return
+	}
+
+	for _, v := range orphans {
+		if err := c.publisher.SendWithRetry(ctx, retryStrategy, []byte(v), nil); err != nil {
+			logger.Error().Err(err).Msg("Failed to publish orphan to queue")
+		}
+	}
 }

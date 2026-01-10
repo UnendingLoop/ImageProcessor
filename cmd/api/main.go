@@ -85,11 +85,34 @@ func main() {
 		}
 	}()
 
+	// запускаем фонового воркера для отслеживания подвисших задач
+	go recoveryLoop(ctx, svc)
+
 	// ждем отмены контекста для запуска грейсфул закрытия соединений бд и кафки
 	<-ctx.Done()
 
 	shutdown(pub, dbConn)
 	log.Println("Exiting worker...")
+}
+
+func recoveryLoop(ctx context.Context, svc ImageAPIService) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Recovery loop crashed:", r)
+		}
+	}()
+
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			svc.ReviveOrphans(context.Background(), 20)
+		}
+	}
 }
 
 func shutdown(cons *wbfkafka.Producer, dbConn *dbpg.DB) {

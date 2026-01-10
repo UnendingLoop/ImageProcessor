@@ -16,9 +16,9 @@ type PostgresRepo struct {
 }
 
 func (p PostgresRepo) Create(ctx context.Context, n *model.Image) error {
-	query := `INSERT INTO images (image_uid, source_key, wm_key, result_key, operation, x_axis, y_axis, status, err_msg, created_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
-	return p.DB.QueryRowContext(ctx, query, n.UID, n.SourceKey, n.WatermarkKey, n.ResultKey, n.Operation, n.X, n.Y, n.Status, n.ErrMsg, n.CreatedAt).Err()
+	query := `INSERT INTO images (image_uid, source_key, wm_key, result_key, operation, x_axis, y_axis, status, err_msg, created_at, updated_at )
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+	return p.DB.QueryRowContext(ctx, query, n.UID, n.SourceKey, n.WatermarkKey, n.ResultKey, n.Operation, n.X, n.Y, n.Status, n.ErrMsg, n.CreatedAt, n.CreatedAt).Err()
 }
 
 func (p PostgresRepo) Get(ctx context.Context, id string) (*model.Image, error) {
@@ -121,9 +121,9 @@ func (p PostgresRepo) UpdateStatus(ctx context.Context, id string, newStat model
 	return nil
 }
 
-func (p PostgresRepo) SaveResult(ctx context.Context, id string, status model.Status, resKey string) error {
-	query := `UPDATE images SET status = $1, updated_at = now(), result_key = $2 WHERE id = $3`
-	row := p.DB.QueryRowContext(ctx, query, status, resKey, id)
+func (p PostgresRepo) SaveResult(ctx context.Context, input *model.Image) error {
+	query := `UPDATE images SET status = $1, updated_at = $2, result_key = $3 WHERE id = $4`
+	row := p.DB.QueryRowContext(ctx, query, input.Status, input.UpdatedAt, input.ResultKey, input.UID)
 
 	if row.Err() != nil {
 		switch {
@@ -135,4 +135,38 @@ func (p PostgresRepo) SaveResult(ctx context.Context, id string, status model.St
 	}
 
 	return nil
+}
+
+func (p PostgresRepo) FetchOrphans(ctx context.Context, limit int) ([]string, error) {
+	query := `SELECT image_uid 
+	FROM images 
+	WHERE status IN ($1, $2) 
+	AND updated_at < now() - interval '10 minutes'
+	LIMIT $3`
+
+	rows, err := p.DB.QueryContext(ctx, query, model.StatusCreated, model.StatusInProgress, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error while closing *sql.Rows after scanning: %v", err)
+		}
+	}()
+
+	orphans := make([]string, 0, limit)
+	for rows.Next() {
+		uid := ""
+		if err := rows.Scan(&uid); err != nil {
+			return nil, err
+		}
+		orphans = append(orphans, uid)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return orphans, nil
 }

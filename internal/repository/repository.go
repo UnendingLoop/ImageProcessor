@@ -22,8 +22,9 @@ type ImageRepo interface {
 	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, id string) (*model.Image, error)
 	GetList(ctx context.Context, req *model.ListRequest) ([]model.Image, error)
-	SaveResult(ctx context.Context, id string, status model.Status, resKey string) error
+	SaveResult(ctx context.Context, input *model.Image) error
 	UpdateStatus(ctx context.Context, id string, newStat model.Status) error
+	FetchOrphans(ctx context.Context, limit int) ([]string, error)
 }
 
 func NewPostgresImageRepo(dbconn *dbpg.DB) ImageRepo {
