@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS images (
-    image_uid TEXT PRIMARY KEY DEFAULT uuid_generate_v4 (),
+    image_uid TEXT PRIMARY KEY,
     source_key TEXT NOT NULL,
     wm_key TEXT,
     result_key TEXT,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS images (
             'done'
         )
     ),
-    err_msg err_msg JSONB DEFAULT '[]',
+    err_msg JSONB DEFAULT '[]',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

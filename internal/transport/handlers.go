@@ -3,9 +3,9 @@ package api
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log"
+	"strconv"
 
 	"github.com/UnendingLoop/ImageProcessor/internal/model"
 	"github.com/wb-go/wbf/ginext"
@@ -33,43 +33,57 @@ func (h ImageHandler) SimplePinger(ctx *ginext.Context) {
 }
 
 func (h ImageHandler) Create(ctx *ginext.Context) {
-	var newImageRaw model.ImageCreateData
-	// чтение метаданных для задачи
-	if err := ctx.BindJSON(&newImageRaw); err != nil {
-		ctx.JSON(400, map[string]string{"error": err.Error()})
-		return
-	}
+	operation := ctx.PostForm("operation")
+	xStr := ctx.PostForm("x_axis")
+	yStr := ctx.PostForm("y_axis")
 
-	if err := ctx.Request.ParseMultipartForm(32 << 20); err != nil {
-		ctx.JSON(400, map[string]string{"error": "invalid multipart form"})
-		return
+	// конвертация x, y в int если они есть
+	var x, y *int
+	if xStr != "" {
+		val, _ := strconv.Atoi(xStr)
+		x = &val
+	}
+	if yStr != "" {
+		val, _ := strconv.Atoi(yStr)
+		y = &val
 	}
 
 	// парсинг исходника
+	var imageSize int64
 	imageFile, imageHeader, err := ctx.Request.FormFile("image")
 	if err != nil {
 		ctx.JSON(400, map[string]string{"error": "image is required"})
 		return
 	}
-	defer imageFile.Close()
-
-	newImageRaw.OrigImg = imageFile
-	newImageRaw.OrigContentType = imageHeader.Header.Get("Content-Type")
-	newImageRaw.OrigImgSize = imageHeader.Size
-
+	defer closeFileFlow(imageFile)
+	imageCType := imageHeader.Header.Get("Content-Type")
+	imageSize = imageHeader.Size
 	// парсинг ватермарка если есть
+	var wmCType string
+	var wmSize int64
 	wmFile, wmHeader, err := ctx.Request.FormFile("watermark")
 	if err != nil {
 		// watermark опционален
 		wmFile = nil
 	} else {
-		defer wmFile.Close()
+		wmCType = wmHeader.Header.Get("Content-Type")
+		wmSize = wmHeader.Size
+		defer closeFileFlow(wmFile)
 	}
-	newImageRaw.WMImg = wmFile
-	newImageRaw.WMContentType = wmHeader.Header.Get("Content-Type")
-	newImageRaw.WMImgSize = wmHeader.Size
 
-	// передаем все в сервис
+	// собираем все в структуру
+	var newImageRaw model.ImageCreateData
+	newImageRaw.Operation = operation
+	newImageRaw.X = x
+	newImageRaw.Y = y
+	newImageRaw.OrigImg = imageFile
+	newImageRaw.OrigContentType = imageCType
+	newImageRaw.OrigImgSize = imageSize
+	newImageRaw.WMImg = wmFile
+	newImageRaw.WMContentType = wmCType
+	newImageRaw.WMImgSize = wmSize
+
+	// передаем в сервис
 	res, err := h.service.Create(ctx.Request.Context(), &newImageRaw)
 	if err != nil {
 		ctx.JSON(errorCodeDefiner(err), map[string]string{"error": err.Error()})
@@ -104,7 +118,7 @@ func (h ImageHandler) LoadResult(ctx *ginext.Context) {
 		ctx.JSON(errorCodeDefiner(err), map[string]string{"error": err.Error()})
 		return
 	}
-	defer res.Close()
+	defer closeFileFlow(res)
 
 	ctx.Writer.Header().Set("Content-Type", cType)
 	ctx.Writer.WriteHeader(200)
@@ -121,23 +135,4 @@ func (h ImageHandler) Delete(ctx *ginext.Context) {
 	}
 
 	ctx.Status(204)
-}
-
-func errorCodeDefiner(err error) int {
-	switch {
-	case errors.Is(err, model.ErrCommon500):
-		return 500
-	case errors.Is(err, model.ErrImageNotFound):
-		return 404
-	case errors.Is(err, model.ErrIncorrectQuery) ||
-		errors.Is(err, model.ErrIncorrectID) ||
-		errors.Is(err, model.ErrIncorrectOp) ||
-		errors.Is(err, model.ErrEmptySource) ||
-		errors.Is(err, model.ErrEmptyWMark) ||
-		errors.Is(err, model.ErrIncorrectAxis) ||
-		errors.Is(err, model.ErrIncorrectStatus):
-		return 400
-	default:
-		return 500
-	}
 }

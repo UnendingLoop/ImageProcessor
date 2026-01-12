@@ -27,7 +27,7 @@ func (NoopPublisher) SendWithRetry(ctx context.Context, strategy retry.Strategy,
 	return nil
 }
 
-type ImageWorkerService interface {
+type ImageWorkerService interface { // дублируется из cmd/worker - может вынести такие структуры/контракты в отдельный пакет(не model)?
 	UpdateStatus(ctx context.Context, id string, newStat model.Status) error
 	SaveResult(ctx context.Context, res *model.Image) error
 	Get(ctx context.Context, id string) (*model.Image, error)

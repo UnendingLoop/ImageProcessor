@@ -77,9 +77,9 @@ const (
 )
 
 type ImageCreateData struct {
-	Operation       string `json:"operation"`
-	X               *int   `json:"x_axis,omitempty"`
-	Y               *int   `json:"y_axis,omitempty"`
+	Operation       string
+	X               *int
+	Y               *int
 	OrigImg         multipart.File
 	OrigContentType string
 	OrigImgSize     int64
@@ -153,6 +153,9 @@ func (s *StringSlice) Scan(value any) error {
 }
 
 func (s StringSlice) Value() (driver.Value, error) {
+	if len(s) == 0 || s == nil {
+		return []byte(`[]`), nil
+	}
 	res, err := json.Marshal(s)
 	return res, fmt.Errorf("failed to marshal []StringSlice to JSONB: %w", err)
 }

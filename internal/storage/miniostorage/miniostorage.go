@@ -2,6 +2,7 @@ package miniostorage
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 
@@ -39,7 +40,7 @@ func NewMinioClient(cfg *config.Config) (*MinioImageStorage, error) {
 
 	// создаем бакет если его нет
 	if err := ensureBucket(context.Background(), strg, bucket); err != nil {
-		log.Printf("Failed to create bucket in MinIO:", err)
+		log.Println("Failed to create bucket in MinIO:", err)
 		return nil, err
 	}
 
@@ -47,6 +48,10 @@ func NewMinioClient(cfg *config.Config) (*MinioImageStorage, error) {
 }
 
 func (s *MinioImageStorage) Put(ctx context.Context, key string, size int64, contentType string, r io.Reader) error {
+	if r == nil {
+		return errors.New("nil reader passed to storage.Put")
+	}
+
 	if _, err := s.client.PutObject(ctx, s.bucket, key, r, size, minio.PutObjectOptions{
 		ContentType: contentType,
 	}); err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/UnendingLoop/ImageProcessor/internal/mwlogger"
 	"github.com/UnendingLoop/ImageProcessor/internal/repository"
 	"github.com/google/uuid"
+	"github.com/wb-go/wbf/config"
 	"github.com/wb-go/wbf/retry"
 )
 
@@ -25,11 +26,14 @@ type ImageService struct {
 	resultKeyPrefix string
 }
 
-func NewImageService(commentRep repository.ImageRepo, pub TaskPublisher, strg ImageStorage) *ImageService {
+func NewImageService(cfg *config.Config, commentRep repository.ImageRepo, pub TaskPublisher, strg ImageStorage) *ImageService {
 	return &ImageService{
-		repo:      commentRep,
-		publisher: pub,
-		storage:   strg,
+		repo:            commentRep,
+		publisher:       pub,
+		storage:         strg,
+		srcKeyPrefix:    cfg.GetString("SOURCE_KEY"),
+		wmKeyPrefix:     cfg.GetString("WM_KEY"),
+		resultKeyPrefix: cfg.GetString("RESULT_KEY"),
 	}
 }
 
@@ -66,7 +70,6 @@ func (c ImageService) Create(ctx context.Context, imageData *model.ImageCreateDa
 
 	// кладем в хранилище сорсник
 	srcKey := c.srcKeyPrefix + newImage.UID.String() + model.GetImageFileExt[imageData.OrigContentType]
-
 	if err := c.storage.Put(ctx, srcKey, imageData.OrigImgSize, imageData.OrigContentType, imageData.OrigImg); err != nil {
 		logger.Error().Err(err).Msg("Failed to save src-image in Storage")
 		return nil, model.ErrCommon500

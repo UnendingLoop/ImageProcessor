@@ -37,12 +37,21 @@ func ConnectWithRetries(appConfig *config.Config, retryCount int, idleTime time.
 		MaxIdleConns:    5,
 		ConnMaxLifetime: 10 * time.Minute,
 	}
-	dsnLink := appConfig.GetString("POSTGRES_DSN")
+
+	dbUser := appConfig.GetString("POSTGRES_USER")
+	dbName := appConfig.GetString("POSTGRES_DB")
+	dbPass := appConfig.GetString("POSTGRES_PASSWORD")
+	dbContName := appConfig.GetString("DB_CONTAINER_NAME")
+	if dbUser == "" || dbName == "" || dbPass == "" || dbContName == "" {
+		log.Fatal("DB connection credentials, db name or DB container name are not set in env")
+	}
+	dsn := "postgresql://" + dbUser + ":" + dbPass + "@" + dbContName + ":5432/" + dbName + "?sslmode=disable"
+
 	var dbConn *dbpg.DB
 	var err error
 
 	for range retryCount {
-		dbConn, err = dbpg.New(dsnLink, nil, &dbOptions)
+		dbConn, err = dbpg.New(dsn, nil, &dbOptions)
 		if err == nil {
 			break
 		}
@@ -68,7 +77,7 @@ func MigrateWithRetries(db *sql.DB, migrationsPath string, retries int, idle tim
 		case retries:
 			log.Fatalln("Out of retries. Exiting...")
 		default:
-			log.Printf("Migration try #%d was unsuccessful. Waiting %v before next try...", i, idle)
+			log.Printf("Migration try #%d was unsuccessful: %v\nWaiting %v before next try...", i, err, idle)
 			time.Sleep(idle)
 		}
 	}

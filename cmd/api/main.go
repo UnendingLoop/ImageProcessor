@@ -10,15 +10,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/UnendingLoop/ImageProcessor/internal/api"
 	"github.com/UnendingLoop/ImageProcessor/internal/kafka"
 	"github.com/UnendingLoop/ImageProcessor/internal/repository"
 	"github.com/UnendingLoop/ImageProcessor/internal/service"
 	"github.com/UnendingLoop/ImageProcessor/internal/storage"
+	api "github.com/UnendingLoop/ImageProcessor/internal/transport"
 	"github.com/wb-go/wbf/config"
 	"github.com/wb-go/wbf/dbpg"
 	"github.com/wb-go/wbf/ginext"
 	wbfkafka "github.com/wb-go/wbf/kafka"
+	"github.com/wb-go/wbf/zlog"
 )
 
 func main() {
@@ -29,13 +30,23 @@ func main() {
 		log.Fatalf("Failed to load envs: %s\nExiting app...", err)
 	}
 
+	// стартуем логгер
+	zlog.InitConsole()
+	err := zlog.SetLevel("info")
+	if err != nil {
+		log.Fatalf("Failed to init logger: %v", err)
+	}
+	// готовим заранее слушатель прерываний - контекст для всего приложения
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	// подключитсья к базе
 	dbConn := repository.ConnectWithRetries(appConfig, 5, 10*time.Second)
-	// накатываем мигрцацию
-	repository.MigrateWithRetries(dbConn.Master, "./migrations", 5, 10*time.Second)
+	// накатываем миграцию
+	repository.MigrateWithRetries(dbConn.Master, "./migrations", 10, 15*time.Second)
 
-	// подкллючиться к хранилищу
-	strg := storage.NewImgStorage(appConfig)
+	// подключиться к хранилищу
+	strg := storage.NewImgStorage(appConfig, 10*time.Second)
 	// создаем экземпляр репо
 	repo := repository.NewPostgresImageRepo(dbConn)
 
@@ -44,10 +55,11 @@ func main() {
 	kafka.WaitKafkaReady(broker)
 	// подключиться к кафке как продюсер
 	topic := appConfig.GetString("KAFKA_TOPIC")
+	kafka.InitKafkaTopics(ctx, broker, 10*time.Second, topic)
 	pub := wbfkafka.NewProducer([]string{broker}, topic)
 
 	// создаем экземпляр сервиса
-	var svc ImageAPIService = service.NewImageService(repo, pub, strg)
+	var svc ImageAPIService = service.NewImageService(appConfig, repo, pub, strg)
 	// cоздаем экземпляр хендлера HTTP
 	handlers := api.NewImageHandler(svc)
 	// сетапим сервер
@@ -65,10 +77,6 @@ func main() {
 		Addr:    ":8080",
 		Handler: engine,
 	}
-
-	// Слушаем прерывания через контекст
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	// Server launch
 	go func() {

@@ -1,46 +1,64 @@
 package kafka
 
 import (
+	"context"
+	"errors"
 	"log"
 	"time"
 
 	kafkago "github.com/segmentio/kafka-go"
 )
 
-// InitKafkaTopic - cerates topics in kafka
-func InitKafkaTopic(brokerAddr string, topics ...string) {
-	topicStructs := make([]kafkago.TopicConfig, 0, len(topics))
-
-	for _, topic := range topics {
-		topicStructs = append(topicStructs, kafkago.TopicConfig{
-			Topic:             topic,
-			NumPartitions:     3,
-			ReplicationFactor: 1,
-		})
+// InitKafkaTopics - creates topics in kafka
+func InitKafkaTopics(ctx context.Context, brokerAddr string, delay time.Duration, topics ...string) {
+	client := &kafkago.Client{
+		Addr:    kafkago.TCP(brokerAddr),
+		Timeout: 10 * time.Second,
 	}
 
-	topicsCreated := false
+	req := kafkago.CreateTopicsRequest{
+		Topics: make([]kafkago.TopicConfig, 0, len(topics)),
+	}
 
-	for !topicsCreated {
-		conn, err := kafkago.Dial("tcp", brokerAddr)
+	for _, t := range topics {
+		topic := kafkago.TopicConfig{
+			Topic:             t,
+			NumPartitions:     1,
+			ReplicationFactor: 1,
+		}
+		req.Topics = append(req.Topics, topic)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("InitKafkaTopics canceled or timed out")
+			return
+		default:
+		}
+
+		resp, err := client.CreateTopics(ctx, &req)
 		if err != nil {
-			log.Println("Failed to dial broker:", err)
-			time.Sleep(5 * time.Second)
+			log.Printf("Failed to run topics creation request: %v\nWait %v before next try...", err, delay)
+			time.Sleep(delay)
 			continue
 		}
-		defer func() {
-			if err := conn.Close(); err != nil {
-				log.Println("Failed to close reader connection to Kafka:", err)
-			}
-		}()
 
-		if err := conn.CreateTopics(topicStructs...); err != nil {
-			log.Println("Failed to create topics:", err)
-			time.Sleep(5 * time.Second)
-			continue
+		successT := 0
+		for k, v := range resp.Errors {
+			switch {
+			case errors.Is(v, kafkago.TopicAlreadyExists):
+				successT++
+			case v == nil:
+			default:
+				log.Printf("Topic %q creation error: %v", k, v)
+			}
 		}
-		log.Println("Topics successfully created!")
-		topicsCreated = true
+
+		if len(resp.Errors) == successT {
+			log.Println("All topics created successfully!")
+			return
+		}
 	}
 }
 
@@ -55,7 +73,7 @@ func WaitKafkaReady(brokerAddr string) {
 			break
 		}
 		log.Println("Kafka not ready, retrying in 5s...")
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
-	time.Sleep(25 * time.Second)
+	log.Println("Kafka is ready!")
 }

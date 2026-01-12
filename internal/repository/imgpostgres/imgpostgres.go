@@ -107,7 +107,7 @@ func (p PostgresRepo) Delete(ctx context.Context, id string) error {
 }
 
 func (p PostgresRepo) UpdateStatus(ctx context.Context, id string, newStat model.Status) error {
-	query := `UPDATE images SET status=$1, updated_at = now() WHERE id = $2`
+	query := `UPDATE images SET status=$1, updated_at = now() WHERE image_uid = $2`
 	row := p.DB.QueryRowContext(ctx, query, newStat, id)
 
 	if row.Err() != nil {
@@ -122,7 +122,7 @@ func (p PostgresRepo) UpdateStatus(ctx context.Context, id string, newStat model
 }
 
 func (p PostgresRepo) SaveResult(ctx context.Context, input *model.Image) error {
-	query := `UPDATE images SET status = $1, updated_at = $2, result_key = $3 WHERE id = $4`
+	query := `UPDATE images SET status = $1, updated_at = $2, result_key = $3 WHERE image_uid = $4`
 	row := p.DB.QueryRowContext(ctx, query, input.Status, input.UpdatedAt, input.ResultKey, input.UID)
 
 	if row.Err() != nil {
