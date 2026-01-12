@@ -111,17 +111,21 @@ func (w *Worker) processTask(ctx context.Context, task *model.Image) error {
 	if err != nil {
 		return fmt.Errorf("worker failed to fetch base-image from storage: %w", err)
 	}
+	defer closeFileFlow(base)
 
 	wm, _, err := w.storage.Get(ctx, task.WatermarkKey)
 	if err != nil && task.Operation == model.OpWaterMark {
 		return fmt.Errorf("worker failed to fetch wm-image from storage: %w", err)
 	}
+	defer closeFileFlow(wm)
 
 	// определить формат выходного файла из cType исходника
 	pBase, format, err := validateImgFormat(base, false)
 	if err != nil {
 		return fmt.Errorf("worker failed to validate base-image format: %w", err)
 	}
+
+	// свалидировать формат ватермарка
 	pWm, _, err := validateImgFormat(wm, true)
 	if err != nil && task.Operation == model.OpWaterMark {
 		return fmt.Errorf("worker failed to validate wm-image format: %w", err)
@@ -132,17 +136,17 @@ func (w *Worker) processTask(ctx context.Context, task *model.Image) error {
 	var size int64
 	switch task.Operation {
 	case model.OpResize:
-		result, size, err = imageproc.Resize(pBase, *task.X, *task.Y, format)
+		result, size, err = imageproc.Resizer(pBase, *task.X, *task.Y, format)
 		if err != nil {
 			return fmt.Errorf("worker failed to resize image: %w", err)
 		}
 	case model.OpThumbNail:
-		result, size, err = imageproc.Thumbnail(pBase, *task.X, *task.Y, format)
+		result, size, err = imageproc.Thumbnailer(pBase, *task.X, *task.Y, format)
 		if err != nil {
 			return fmt.Errorf("worker failed to generate thumbnail from image: %w", err)
 		}
 	case model.OpWaterMark:
-		result, size, err = imageproc.Watermark(pBase, pWm, format)
+		result, size, err = imageproc.Watermarker(pBase, pWm, format)
 		if err != nil {
 			return fmt.Errorf("worker failed to apply wm on image: %w", err)
 		}
@@ -168,7 +172,10 @@ func (w *Worker) processTask(ctx context.Context, task *model.Image) error {
 }
 
 func validateImgFormat(r io.ReadCloser, wm bool) (io.Reader, imaging.Format, error) {
-	defer r.Close()
+	if r == nil {
+		return nil, -1, errors.New("nil-reader provided to validateImgFormat")
+	}
+
 	br := bufio.NewReader(r)
 
 	// читаем первые 512 байт для определения формата - должно быть достаточно?
@@ -198,4 +205,14 @@ func validateImgFormat(r io.ReadCloser, wm bool) (io.Reader, imaging.Format, err
 
 	// возвращаем результат - все ок
 	return br, format, nil
+}
+
+func closeFileFlow(res io.ReadCloser) {
+	if res == nil {
+		return
+	}
+
+	if err := res.Close(); err != nil {
+		log.Println("Worker failed to close fileflow:", err)
+	}
 }

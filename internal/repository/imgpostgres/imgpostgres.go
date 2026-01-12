@@ -22,7 +22,7 @@ func (p PostgresRepo) Create(ctx context.Context, n *model.Image) error {
 }
 
 func (p PostgresRepo) Get(ctx context.Context, id string) (*model.Image, error) {
-	query := `SELECT image_uid, source_key, wm_key, result_key, operation, status, err_msg, created_at, updated_at 
+	query := `SELECT image_uid, source_key, wm_key, result_key, operation, x_axis, y_axis, status, err_msg, created_at, updated_at 
 	FROM images 
 	WHERE image_uid = $1`
 	var image model.Image
@@ -32,6 +32,8 @@ func (p PostgresRepo) Get(ctx context.Context, id string) (*model.Image, error) 
 		&image.WatermarkKey,
 		&image.ResultKey,
 		&image.Operation,
+		&image.X,
+		&image.Y,
 		&image.Status,
 		&image.ErrMsg,
 		&image.CreatedAt,

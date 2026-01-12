@@ -31,7 +31,10 @@ func errorCodeDefiner(err error) int {
 }
 
 func closeFileFlow(res io.ReadCloser) {
+	if res == nil {
+		return
+	}
 	if err := res.Close(); err != nil {
-		log.Println("Failed to close fileflow:", err)
+		log.Println("Handler failed to close fileflow:", err)
 	}
 }
