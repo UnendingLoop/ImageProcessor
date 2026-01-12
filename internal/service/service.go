@@ -69,17 +69,17 @@ func (c ImageService) Create(ctx context.Context, imageData *model.ImageCreateDa
 	newImage.UID = uuid.New()
 
 	// кладем в хранилище сорсник
-	srcKey := c.srcKeyPrefix + newImage.UID.String() + model.GetImageFileExt[imageData.OrigContentType]
-	if err := c.storage.Put(ctx, srcKey, imageData.OrigImgSize, imageData.OrigContentType, imageData.OrigImg); err != nil {
+	newImage.SourceKey = c.srcKeyPrefix + newImage.UID.String() + model.GetImageFileExt[imageData.OrigContentType]
+	if err := c.storage.Put(ctx, newImage.SourceKey, imageData.OrigImgSize, imageData.OrigContentType, imageData.OrigImg); err != nil {
 		logger.Error().Err(err).Msg("Failed to save src-image in Storage")
 		return nil, model.ErrCommon500
 	}
 
 	// кладем в хранилище ватермарк - если надо по типу операции
 	if newImage.Operation == model.OpWaterMark {
-		wmKey := c.wmKeyPrefix + newImage.UID.String() + model.GetImageFileExt[imageData.WMContentType]
+		newImage.WatermarkKey = c.wmKeyPrefix + newImage.UID.String() + model.GetImageFileExt[imageData.WMContentType]
 
-		if err := c.storage.Put(ctx, wmKey, imageData.WMImgSize, imageData.WMContentType, imageData.WMImg); err != nil {
+		if err := c.storage.Put(ctx, newImage.WatermarkKey, imageData.WMImgSize, imageData.WMContentType, imageData.WMImg); err != nil {
 			logger.Error().Err(err).Msg("Failed to save watermark in Storage")
 			return nil, model.ErrCommon500
 		}
