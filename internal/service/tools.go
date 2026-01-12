@@ -81,10 +81,6 @@ func validateNormalizeOperation(input *model.Image) error {
 		if err := validateNormalizeAxisThumbnail(input); err != nil {
 			return nil
 		}
-	case model.OpWaterMark:
-		if input.WatermarkKey == "" {
-			return model.ErrEmptyWMark
-		}
 	}
 	return nil
 }
@@ -99,11 +95,11 @@ func validateNormalizeAxisThumbnail(input *model.Image) error {
 	// кейс: одна из осей равна нулю
 	if x <= 0 {
 		input.X = input.Y
-		input.ErrMsg = append(input.ErrMsg, fmt.Sprintf("X-axis incorrect value: using Y-axis value %q for X-axis for generating thumbnail", *input.X))
+		input.ErrMsg = append(input.ErrMsg, fmt.Sprintf("X-axis incorrect value: using Y-axis value %d for X-axis for generating thumbnail", *input.X))
 	}
 	if y <= 0 {
 		input.Y = input.X
-		input.ErrMsg = append(input.ErrMsg, fmt.Sprintf("Y-axis incorrect value: using X-axis value %q for Y-axis for generating thumbnail", *input.Y))
+		input.ErrMsg = append(input.ErrMsg, fmt.Sprintf("Y-axis incorrect value: using X-axis value %d for Y-axis for generating thumbnail", *input.Y))
 	}
 
 	// кейс: неодинаковые значения - берем меньшее
@@ -113,7 +109,7 @@ func validateNormalizeAxisThumbnail(input *model.Image) error {
 		} else {
 			input.Y = input.X
 		}
-		input.ErrMsg = append(input.ErrMsg, fmt.Sprintf("Axis values must be equal for thumbnail: using smaller value %q", *input.X))
+		input.ErrMsg = append(input.ErrMsg, fmt.Sprintf("Axis values must be equal for thumbnail: using smaller value %d", *input.X))
 	}
 
 	return nil

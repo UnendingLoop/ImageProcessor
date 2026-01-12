@@ -405,7 +405,7 @@
 
     <script>
         const API_BASE = '/api';
-        const POLL_INTERVAL = 2000; // 2 секунды
+        const POLL_INTERVAL = 10000; // 10 секунд
         let pollInterval;
 
         // Инициализация
@@ -462,7 +462,7 @@
             if (['resize', 'thumbnail'].includes(operation)) {
                 const x = document.getElementById('xAxis').value;
                 const y = document.getElementById('yAxis').value;
-                if (!x || !y) {
+                if (!x && !y) {
                     showToast('Укажите размеры', 'error');
                     return;
                 }
@@ -568,7 +568,7 @@
                 window.URL.revokeObjectURL(url);
                 a.remove();
 
-                showToast('Файл загружен', 'success');
+                showToast('Файл готов', 'success');
             } catch (error) {
                 showToast('Ошибка: ' + error.message, 'error');
             }
