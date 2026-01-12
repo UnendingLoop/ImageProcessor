@@ -364,12 +364,13 @@
                     <div class="form-row" id="axisFields" style="display: none;">
                         <div class="form-group">
                             <label for="xAxis">Ширина (px)*</label>
-                            <input type="number" id="xAxis" min="1" max="4000" placeholder="800">
+                            <input type="number" id="xAxis" min="0" max="4000" placeholder="800">
                         </div>
                         <div class="form-group">
                             <label for="yAxis">Высота (px)*</label>
-                            <input type="number" id="yAxis" min="1" max="4000" placeholder="600">
+                            <input type="number" id="yAxis" min="0" max="4000" placeholder="600">
                         </div>
+                        <small style="color: #999;">Укажите хотя бы одно значение</small>
                     </div>
 
                     <div class="form-group">
@@ -541,7 +542,7 @@
                         <p><strong>Размеры:</strong> ${task.x_axis || '--'} × ${task.y_axis || '--'} px</p>
                         <p><strong>Создано:</strong> ${formatDate(task.created_at)}</p>
                         ${task.error && task.error.length > 0 ?
-                    `<p style="color: #e74c3c;"><strong>Ошибка:</strong> ${task.error[0]}</p>` : ''}
+                    `<p style="color: #e74c3c;"><strong>Предупреждения:</strong> ${task.error[0]}</p>` : ''}
                     </div>
                     <div class="task-actions">
                         ${task.status === 'done' ?
@@ -599,7 +600,7 @@
             const statusMap = {
                 'created': '📋 Создана',
                 'in_progress': '⏳ В обработке',
-                'done': '✅ Готова',
+                'done': '✅ Готово',
                 'failed': '❌ Ошибка'
             };
             return statusMap[status] || status;

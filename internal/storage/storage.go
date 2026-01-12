@@ -21,7 +21,7 @@ func NewImgStorage(cfg *config.Config, delay time.Duration) *miniostorage.MinioI
 			time.Sleep(delay)
 			continue
 		}
-		log.Println("Successfully connected IMG-storage!")
+		log.Println("Successfully connected to IMG-storage!")
 		success = true
 	}
 
