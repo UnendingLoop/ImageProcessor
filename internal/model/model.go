@@ -157,5 +157,9 @@ func (s StringSlice) Value() (driver.Value, error) {
 		return []byte(`[]`), nil
 	}
 	res, err := json.Marshal(s)
-	return res, fmt.Errorf("failed to marshal []StringSlice to JSONB: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal []StringSlice to JSONB: %w", err)
+	}
+
+	return res, nil
 }
