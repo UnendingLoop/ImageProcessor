@@ -1,3 +1,4 @@
+// Package main (in worker-subfolder) provides processing the queue and images conversion
 package main
 
 import (

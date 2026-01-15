@@ -1,3 +1,4 @@
+// Package miniostorage provides structure to work with minio-storage
 package miniostorage
 
 import (
@@ -22,7 +23,6 @@ func NewMinioClient(cfg *config.Config) (*MinioImageStorage, error) {
 	if bucket == "" {
 		bucket = "default"
 		log.Printf("Bucket name is empty. Using default value %q...", bucket)
-
 	}
 
 	user := cfg.GetString("MINIO_USER")

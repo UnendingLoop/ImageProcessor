@@ -1,5 +1,5 @@
-// Package api provides methods for processing requests from endpoints
-package api
+// Package transport provides methods for processing requests from endpoints
+package transport
 
 import (
 	"context"

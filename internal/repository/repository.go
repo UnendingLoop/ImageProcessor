@@ -1,4 +1,4 @@
-// Package repository provides methods to work with DB
+// Package repository declares contract to work with DB, also provides migration and connect-with-retry methods to DB.
 package repository
 
 import (

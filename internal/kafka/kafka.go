@@ -1,3 +1,4 @@
+// Package kafka provides methods for initiating kafka-topics for the app and a kafka readiness-probing
 package kafka
 
 import (

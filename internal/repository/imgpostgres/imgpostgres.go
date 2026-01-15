@@ -1,3 +1,4 @@
+// Package imgpostgres provides methods to access database
 package imgpostgres
 
 import (
@@ -96,44 +97,44 @@ func (p PostgresRepo) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM images
 	WHERE image_uid = $1`
 
-	row := p.DB.QueryRowContext(ctx, query, id)
-	if row.Err() != nil {
-		switch {
-		case errors.Is(row.Err(), sql.ErrNoRows):
-			return model.ErrImageNotFound // 404
-		default:
-			return row.Err() // 500
-		}
+	res, err := p.DB.ExecContext(ctx, query, id)
+	if err != nil {
+		return err // 500
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return model.ErrImageNotFound // 404
 	}
 	return nil
 }
 
 func (p PostgresRepo) UpdateStatus(ctx context.Context, id string, newStat model.Status) error {
 	query := `UPDATE images SET status=$1, updated_at = now() WHERE image_uid = $2`
-	row := p.DB.QueryRowContext(ctx, query, newStat, id)
 
-	if row.Err() != nil {
-		switch {
-		case errors.Is(row.Err(), sql.ErrNoRows):
-			return model.ErrImageNotFound // 404
-		default:
-			return row.Err() // 500
-		}
+	res, err := p.DB.ExecContext(ctx, query, newStat, id)
+	if err != nil {
+		return err // 500
 	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return model.ErrImageNotFound // 404
+	}
+
 	return nil
 }
 
 func (p PostgresRepo) SaveResult(ctx context.Context, input *model.Image) error {
 	query := `UPDATE images SET status = $1, updated_at = $2, result_key = $3 WHERE image_uid = $4`
-	row := p.DB.QueryRowContext(ctx, query, input.Status, input.UpdatedAt, input.ResultKey, input.UID)
 
-	if row.Err() != nil {
-		switch {
-		case errors.Is(row.Err(), sql.ErrNoRows):
-			return model.ErrImageNotFound // 404
-		default:
-			return row.Err() // 500
-		}
+	res, err := p.DB.ExecContext(ctx, query, input.Status, input.UpdatedAt, input.ResultKey, input.UID)
+	if err != nil {
+		return err // 500
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return model.ErrImageNotFound // 404
 	}
 
 	return nil

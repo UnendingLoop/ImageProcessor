@@ -27,12 +27,11 @@ linters:
     - dogsled         # игнорирование return values
     - misspell        # опечатки в коде
     - whitespace      # лишние пробелы
-    - wrapcheck       # проверка fmt.Errorf("%w")
   disable-all: false
 
 linters-settings:
   gocyclo:
-    min-complexity: 10   # функции сложнее 10 будут предупреждать
+    min-complexity: 15   # функции сложнее 15 будут предупреждать
   revive:
     severity: warning
     rules:

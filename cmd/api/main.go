@@ -1,3 +1,4 @@
+// Package main (in api-subfolder) provides launch of the whole application except worker
 package main
 
 import (
@@ -14,7 +15,7 @@ import (
 	"github.com/UnendingLoop/ImageProcessor/internal/repository"
 	"github.com/UnendingLoop/ImageProcessor/internal/service"
 	"github.com/UnendingLoop/ImageProcessor/internal/storage"
-	api "github.com/UnendingLoop/ImageProcessor/internal/transport"
+	"github.com/UnendingLoop/ImageProcessor/internal/transport"
 	"github.com/wb-go/wbf/config"
 	"github.com/wb-go/wbf/dbpg"
 	"github.com/wb-go/wbf/ginext"
@@ -61,7 +62,7 @@ func main() {
 	// создаем экземпляр сервиса
 	var svc ImageAPIService = service.NewImageService(appConfig, repo, pub, strg)
 	// cоздаем экземпляр хендлера HTTP
-	handlers := api.NewImageHandler(svc)
+	handlers := transport.NewImageHandler(svc)
 	// сетапим сервер
 	mode := appConfig.GetString("GIN_MODE")
 	engine := ginext.New(mode)
@@ -74,7 +75,7 @@ func main() {
 	engine.Static("/web", "./internal/web")
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + appConfig.GetString("APP_PORT"),
 		Handler: engine,
 	}
 

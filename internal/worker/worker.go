@@ -1,7 +1,7 @@
+// Package worker contains methods for worker to init at start, and to process images
 package worker
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -173,18 +173,16 @@ func (w *Worker) processTask(ctx context.Context, task *model.Image) error {
 
 func validateImgFormat(r io.ReadCloser, wm bool) (io.Reader, imaging.Format, error) {
 	if r == nil {
-		return nil, -1, errors.New("nil-reader provided to validateImgFormat")
+		return nil, -1, errors.New("nil-reader provided")
 	}
+	defer r.Close()
 
-	br := bufio.NewReader(r)
-
-	// читаем первые 512 байт для определения формата - должно быть достаточно?
-	header, err := br.Peek(512)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, -1, err
 	}
 
-	_, f, err := image.DecodeConfig(bytes.NewReader(header))
+	_, f, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return nil, -1, err
 	}
@@ -194,17 +192,17 @@ func validateImgFormat(r io.ReadCloser, wm bool) (io.Reader, imaging.Format, err
 		return nil, -1, err
 	}
 
-	// отдельная проверка для формата ватермарка
 	if wm && format != imaging.PNG {
 		return nil, -1, model.ErrUnsupportedWMFormat
 	}
 
-	if format != imaging.JPEG && format != imaging.PNG && format != imaging.GIF {
+	switch format {
+	case imaging.PNG, imaging.JPEG, imaging.GIF:
+	default:
 		return nil, -1, model.ErrUnsupportedFormat
 	}
 
-	// возвращаем результат - все ок
-	return br, format, nil
+	return bytes.NewReader(data), format, nil
 }
 
 func closeFileFlow(res io.ReadCloser) {

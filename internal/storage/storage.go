@@ -1,3 +1,4 @@
+// Package storage provides method for creating and returning new entity of Minio
 package storage
 
 import (
