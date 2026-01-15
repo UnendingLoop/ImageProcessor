@@ -119,40 +119,189 @@ func TestPostgresRepo_GetList_OK(t *testing.T) {
 	require.Len(t, res, 2)
 }
 
-// DELETE - SUCCESS - дописать аналогичные и для update с saveresult
-func TestPostgresRepo_Delete_OK(t *testing.T) {
-	repo, mock := newRepoWithMock(t)
+// DELETE - SUCCESS/NOTFOUND/DBERROR
+func TestPostgresRepo_Delete_Table(t *testing.T) {
+	errDBDown := errors.New("db down")
 
-	mock.ExpectExec(`DELETE FROM images`).
-		WithArgs("id").
-		WillReturnResult(sqlmock.NewResult(0, 1)) // 1 row affected
+	tests := []struct {
+		name      string
+		setupMock func(m sqlmock.Sqlmock)
+		wantErr   error
+	}{
+		{
+			name: "ok",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`DELETE FROM images`).
+					WithArgs("1").
+					WillReturnResult(sqlmock.NewResult(0, 1))
+			},
+			wantErr: nil,
+		},
+		{
+			name: "not found",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`DELETE FROM images`).
+					WithArgs("1").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			wantErr: model.ErrImageNotFound,
+		},
+		{
+			name: "db error",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`DELETE FROM images`).
+					WithArgs("1").
+					WillReturnError(errDBDown)
+			},
+			wantErr: errDBDown,
+		},
+	}
 
-	err := repo.Delete(context.Background(), "id")
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// arrange
+			repo, mock := newRepoWithMock(t)
+			tt.setupMock(mock)
+
+			// act
+			err := repo.Delete(context.Background(), "1")
+
+			// assert
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }
 
-// DELETE - NOT FOUND
-func TestPostgresRepo_Delete_NotFound(t *testing.T) {
-	repo, mock := newRepoWithMock(t)
+// UPDATESTATUS - SUCCESS/NOTFOUND/DBERROR
+func TestRepository_UpdateStatus_Table(t *testing.T) {
+	errDBDown := errors.New("db down")
 
-	mock.ExpectExec(`DELETE FROM images`).
-		WithArgs("id").
-		WillReturnResult(sqlmock.NewResult(0, 0)) // 0 rows affected
+	tests := []struct {
+		name      string
+		setupMock func(m sqlmock.Sqlmock)
+		wantErr   error
+	}{
+		{
+			name: "ok",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`UPDATE images`).
+					WithArgs(model.StatusInProgress, "1").
+					WillReturnResult(sqlmock.NewResult(0, 1))
+			},
+			wantErr: nil,
+		},
+		{
+			name: "not found",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`UPDATE images`).
+					WithArgs(model.StatusInProgress, "1").
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			wantErr: model.ErrImageNotFound,
+		},
+		{
+			name: "db error",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`UPDATE images`).
+					WithArgs(model.StatusInProgress, "1").
+					WillReturnError(errDBDown)
+			},
+			wantErr: errDBDown,
+		},
+	}
 
-	err := repo.Delete(context.Background(), "id")
-	require.ErrorIs(t, err, model.ErrImageNotFound)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// arrange
+			repo, mock := newRepoWithMock(t)
+			tt.setupMock(mock)
+
+			// act
+			err := repo.UpdateStatus(context.Background(), "1", model.StatusInProgress)
+
+			// assert
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }
 
-// DELETE - DBERROR
-func TestPostgresRepo_Delete_DBError(t *testing.T) {
-	repo, mock := newRepoWithMock(t)
+// SAVERESULT - SUCCESS/NOTFOUND/DBERROR
+func TestPostgresRepo_SaveResult_Table(t *testing.T) {
+	errDBDown := errors.New("db down")
+	stime := time.Now()
+	uid := uuid.New()
+	img := model.Image{
+		UID:       uid,
+		ResultKey: "result/img.jpg",
+		UpdatedAt: &stime,
+		Status:    model.StatusDone,
+	}
 
-	mock.ExpectExec(`DELETE FROM images`).
-		WithArgs("id").
-		WillReturnError(errors.New("db down"))
+	tests := []struct {
+		name      string
+		setupMock func(m sqlmock.Sqlmock)
+		wantErr   error
+	}{
+		{
+			name: "ok",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`UPDATE images`).
+					WithArgs(img.Status, img.UpdatedAt, img.ResultKey, img.UID).
+					WillReturnResult(sqlmock.NewResult(0, 1))
+			},
+			wantErr: nil,
+		},
+		{
+			name: "not found",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`UPDATE images`).
+					WithArgs(img.Status, img.UpdatedAt, img.ResultKey, img.UID).
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			wantErr: model.ErrImageNotFound,
+		},
+		{
+			name: "db error",
+			setupMock: func(m sqlmock.Sqlmock) {
+				m.ExpectExec(`UPDATE images`).
+					WithArgs(img.Status, img.UpdatedAt, img.ResultKey, img.UID).
+					WillReturnError(errDBDown)
+			},
+			wantErr: errDBDown,
+		},
+	}
 
-	err := repo.Delete(context.Background(), "id")
-	require.Error(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// arrange
+			repo, mock := newRepoWithMock(t)
+			tt.setupMock(mock)
+
+			// act
+			err := repo.SaveResult(context.Background(), &img)
+
+			// assert
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }
 
 // FETCHORPHANS - SUCCESS
