@@ -129,14 +129,15 @@ func shutdown(cons *wbfkafka.Producer, dbConn *dbpg.DB) {
 
 	// Closing Kafka connection:
 	if err := cons.Close(); err != nil {
-		log.Println("Failed to close Kafka-reader:", err)
+		log.Println("Failed to close Kafka-Producer:", err)
+	} else {
+		log.Println("Kafka-Producer connection closed.")
 	}
-	log.Println("Kafka-consumer connection closed.")
 
 	// Closing DB connection
 	if err := dbConn.Master.Close(); err != nil {
 		log.Println("Failed to close DB-conn correctly:", err)
-		return
+	} else {
+		log.Println("DBconn closed")
 	}
-	log.Println("DBconn closed")
 }
